@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="cs"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tmavá komora – editor fotek</title>
+<meta name="description" content="Prohlížečový editor fotek ve stylu Lightroom: RAW náhledy, TIFF, filmové předvolby, retuš.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#121214;--pan:#1c1c1f;--pan2:#252529;--line:#2b2b30;--ink:#e6e6e9;--mute:#8d8d95;--acc:#5b9cff;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:12.5px/1.4 Inter,"Segoe UI",system-ui,sans-serif;display:grid;grid-template-rows:46px 1fr;overflow:hidden;-webkit-font-smoothing:antialiased}
+header{display:flex;gap:8px;align-items:center;padding:0 14px;background:linear-gradient(#232327,#1c1c1f);border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:9px;font:600 15px Georgia,"Times New Roman",serif;letter-spacing:.02em;margin-right:16px;white-space:nowrap}
+.logo svg{width:21px;height:21px;stroke:var(--acc);fill:none;stroke-width:1.5}
+#info{margin-right:auto;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+button,select{background:var(--pan2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer;transition:background .15s,border-color .15s}
+button:hover,select:hover{background:#2f2f35;border-color:#3d3d44}
+button.on{background:var(--acc);border-color:var(--acc);color:#07111f;font-weight:600}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#app{display:grid;grid-template-columns:208px 1fr 300px;min-height:0}
+aside{background:var(--pan);overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:#3a3a40 transparent}
+#L{border-right:1px solid var(--line)}#R{border-left:1px solid var(--line)}
+#center{display:grid;grid-template-rows:1fr auto auto;min-width:0;min-height:0}
+#stage{display:flex;overflow:hidden;padding:16px;background:radial-gradient(ellipse at 50% 40%,#1b1b1f 0%,#0f0f11 100%);min-height:0}
+#view{margin:auto;flex:none;border-radius:2px;touch-action:none;box-shadow:0 22px 60px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05)}
+#cur{position:fixed;pointer-events:none;border:1px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.7);display:none;transform:translate(-50%,-50%);z-index:5}
+#bar{display:flex;gap:6px;align-items:center;padding:7px 12px;background:var(--pan);border-top:1px solid var(--line);overflow:hidden}
+#hint{margin-left:auto;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#stars{display:flex;gap:1px;margin-left:10px}
+#stars button{padding:1px 5px;background:none;border:0;color:#5d5d66;font-size:16px}
+#stars button.on{background:none;color:#f5c542}
+#film{display:flex;gap:8px;padding:8px 12px;background:var(--pan);border-top:1px solid var(--line);overflow-x:auto;height:92px;scrollbar-width:thin}
+.th{position:relative;border-radius:4px;overflow:hidden;cursor:pointer;flex:none;height:72px;opacity:.65;outline:2px solid transparent;outline-offset:1px;transition:opacity .15s,outline-color .15s}
+.th:hover{opacity:1}.th.sel{opacity:1;outline-color:var(--acc)}.th canvas{display:block;height:100%}
+.bd{position:absolute;left:4px;bottom:2px;font-size:10px;color:#fff;text-shadow:0 1px 3px #000}
+details{border-bottom:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;padding:10px 14px;font-weight:600;display:flex;align-items:center;gap:8px;user-select:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--mute);border-bottom:1.5px solid var(--mute);transform:rotate(-45deg);transition:transform .2s;margin:0 3px 0 1px}
+details[open]>summary::before{transform:rotate(45deg)}
+summary:hover{background:#212125}
+.body{padding:4px 14px 12px}
+.pr{display:block;width:calc(100% - 12px);margin:0 6px;text-align:left;background:none;border:0;border-radius:5px;padding:5px 10px;color:#c4c4ca}
+.pr:hover{background:#2a2a2f;color:var(--ink)}.pr.act{background:rgba(91,156,255,.16);color:#fff}
+#presets{padding:4px 0}#presets summary{font-weight:500;color:#b9b9c0;background:#212124}
+.sl{margin:7px 0}.sl>div{display:flex;justify-content:space-between;color:#a6a6ae;margin-bottom:1px}
+.sl output{color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;height:16px;margin:0;-webkit-appearance:none;appearance:none;background:none;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:linear-gradient(90deg,#3b3b41 var(--a,0%),var(--acc) var(--a,0%),var(--acc) var(--b,0%),#3b3b41 var(--b,0%))}
+input[type=range]::-moz-range-track{height:3px;border-radius:2px;background:linear-gradient(90deg,#3b3b41 var(--a,0%),var(--acc) var(--a,0%),var(--acc) var(--b,0%),#3b3b41 var(--b,0%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#f1f1f3;margin-top:-5px;box-shadow:0 1px 4px rgba(0,0,0,.7);transition:transform .12s}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#f1f1f3;box-shadow:0 1px 4px rgba(0,0,0,.7)}
+input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.18)}
+input[data-g=temp]::-webkit-slider-runnable-track{background:linear-gradient(90deg,#3a7bd5,#e8d44d)}
+input[data-g=tint]::-webkit-slider-runnable-track{background:linear-gradient(90deg,#4caf50,#c24bb0)}
+input[data-g=temp]::-moz-range-track{background:linear-gradient(90deg,#3a7bd5,#e8d44d)}
+input[data-g=tint]::-moz-range-track{background:linear-gradient(90deg,#4caf50,#c24bb0)}
+#hist{display:block;width:100%;height:92px;background:#141416;border-bottom:1px solid var(--line)}
+#tools{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line)}
+#tools button{flex:1;height:36px;padding:0;display:grid;place-items:center}
+#tools svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
+#drop{display:none;position:fixed;inset:12px;border:2px dashed var(--acc);border-radius:14px;background:rgba(12,12,16,.78);z-index:20;place-items:center;pointer-events:none;font:500 20px Georgia,serif}
+.drag #drop{display:grid}
+#tabs{display:none}
+@media(max-width:900px){
+ body{height:100dvh;grid-template-rows:auto minmax(0,1fr)}
+ header{flex-wrap:wrap;min-height:46px;padding:calc(6px + env(safe-area-inset-top,0px)) 10px 6px}
+ .logo{margin-right:auto}#info{display:none}
+ #app{grid-template-columns:1fr;grid-template-rows:minmax(0,46%) auto minmax(0,1fr)}
+ #center{order:1}
+ #tabs{order:2;display:flex;background:var(--pan);border-top:1px solid var(--line)}
+ #tabs button{flex:1;border:0;border-radius:0;background:none;padding:11px 8px;color:var(--mute);font-weight:500;border-bottom:2px solid transparent}
+ #tabs button.on{background:none;color:var(--ink);border-bottom-color:var(--acc)}
+ #L,#R{order:3;border:0;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+ body[data-tab=edit] #L,body[data-tab=presets] #R{display:none}
+ #stage{padding:8px}
+ #bar{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;padding:6px 10px}#bar button{flex:none;white-space:nowrap}#hint{flex:none}
+ #film{height:70px;padding:6px 10px}.th{height:56px}
+ button,select{min-height:38px}
+ summary{padding:13px 14px}.pr{padding:11px 12px}
+ input[type=range]{height:30px}
+ input[type=range]::-webkit-slider-thumb{width:22px;height:22px;margin-top:-9px}
+ input[type=range]::-moz-range-thumb{width:22px;height:22px}
+ #tools button{height:44px}
+ #stars button{font-size:20px;padding:0 6px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body data-tab="edit">
+<header><span class="logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3l4 7M20.4 8.5l-7 .5M19.8 16.5l-5-5M12 21l-4-7M3.6 15.5l7-.5M4.2 7.5l5 5"/></svg>Tmavá komora</span><span id="info"></span>
+<button id="open">Otevřít fotky</button><button id="save" class="on">Exportovat</button>
+<select id="fmt"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option><option value="image/tiff">TIFF (8 bit)</option></select>
+<input type="file" id="file" accept="image/*,.tif,.tiff,.dng,.cr2,.cr3,.crw,.nef,.nrw,.arw,.srf,.sr2,.raf,.orf,.rw2,.pef,.srw,.3fr,.erf,.kdc,.mrw,.raw,.rwl,.iiq" multiple hidden></header>
+<div id="app">
+<aside id="L"><details open><summary>Předvolby</summary><div id="presets"></div></details><details open><summary>Nastavení a filtr</summary><div class="body"><div class="chips"><button id="cp">Kopírovat</button><button id="ps">Vložit</button><button id="al">Všem</button></div><select id="flt" style="width:100%"><option value="0">Všechny fotky</option><option value="p">Vybrané ⚑</option><option value="1">★ 1 a více</option><option value="3">★ 3 a více</option><option value="5">★ 5</option></select></div></details></aside>
+<div id="center"><div id="stage"><canvas id="view"></canvas></div>
+<div id="bar"><button id="zoom">Zoom 1:1</button><button id="ba">Originál (podrž \)</button><button id="split">Před / Po</button><button id="clip" title="Varování ořezu (J)">Ořez světel</button><button id="undo">Zpět</button><span id="stars"></span><span id="hint">Otevři fotku nebo ji přetáhni do okna.</span></div>
+<div id="film"></div></div>
+<nav id="tabs"><button data-tab="edit" class="on">Úpravy</button><button data-tab="presets">Předvolby a fotky</button></nav><aside id="R"><canvas id="hist" width="256" height="84"></canvas>
+<div id="tools">
+<button data-t="heal" title="Odstranění skvrn (automatický zdroj)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 8v8M8 12h8"/></svg></button>
+<button data-t="clone" title="Klonování (Alt+klik nastaví zdroj)"><svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5" stroke-dasharray="2 2"/></svg></button>
+<button data-t="smooth" title="Vyhlazení pleti"><svg viewBox="0 0 24 24"><path d="M12 3C8 9 6 12 6 15a6 6 0 0012 0c0-3-2-6-6-12z"/></svg></button>
+<button data-t="dodge" title="Zesvětlit štětcem"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg></button>
+<button data-t="burn" title="Ztmavit štětcem"><svg viewBox="0 0 24 24"><path d="M20 14A8 8 0 019 4a8 8 0 1011 10z"/></svg></button></div>
+<div id="opts" class="body" style="display:none;border-bottom:1px solid var(--line)"></div>
+<div id="panels"></div></aside></div>
+<div id="cur"></div><div id="drop"><span>Pusť fotky sem</span></div>
+<script>
+const ASP=[['Původní',0],['1:1',1],['6:7',6/7],['4:5',.8],['3:2',1.5],['16:9',16/9],['5:4',1.25]];
+const SEC=[
+['Základní',[['temp','Teplota',-100,100,0,1,'temp'],['tint','Odstín',-100,100,0,1,'tint'],['exposure','Expozice',-3,3,0,.01],['contrast','Kontrast',-100,100,0,1],['highlights','Světla',-100,100,0,1],['shadows','Stíny',-100,100,0,1],['whites','Bílé',-100,100,0,1],['blacks','Černé',-100,100,0,1],['texture','Textura',-100,100,0,1],['clarity','Jasnost',-100,100,0,1],['vibrance','Živost',-100,100,0,1],['saturation','Sytost',-100,100,0,1]]],
+['Detail',[['sharpen','Doostření',0,100,0,1]]],
+['Efekty',[['vignette','Vinětace',-100,100,0,1],['grain','Zrno',0,100,0,1]]],
+['Geometrie',[['angle','Narovnání',-15,15,0,.1]]],
+['Barevný mix',[...Array(8).keys()].flatMap(c=>[['h'+c,'Odstín',-100,100,0,1],['s'+c,'Sytost',-100,100,0,1],['l'+c,'Jas',-100,100,0,1]])],
+['Ořez',[['zoom','Přiblížení',100,300,100,1],['cropx','Posun X',-100,100,0,1],['cropy','Posun Y',-100,100,0,1]]]];
+const PRE={
+'Barevný negativ':{
+'Kodak Portra 160':{temp:6,contrast:-10,saturation:-10,shadows:20,vibrance:10,blacks:12,grain:12},
+'Kodak Portra 400':{temp:12,contrast:-8,saturation:-6,shadows:20,vibrance:15,blacks:15,grain:20},
+'Kodak Portra 800':{temp:10,contrast:-4,saturation:-4,shadows:15,vibrance:12,blacks:10,grain:35},
+'Kodak Ektar 100':{temp:4,contrast:22,saturation:30,vibrance:10,blacks:-5,grain:8},
+'Kodak Gold 200':{temp:25,contrast:10,saturation:12,highlights:-10,vignette:-15,grain:25},
+'Kodak ColorPlus 200':{temp:18,tint:6,contrast:12,saturation:10,vignette:-10,grain:28},
+'Kodak UltraMax 400':{temp:14,contrast:16,saturation:16,highlights:-8,vignette:-12,grain:32},
+'Kodak ProImage 100':{temp:8,contrast:10,saturation:8,grain:12},
+'Fujifilm Superia 400':{temp:-6,tint:-8,contrast:14,saturation:14,shadows:8,grain:30},
+'Fujifilm C200':{temp:-4,tint:-6,contrast:10,saturation:6,grain:24},
+'Fujifilm Pro 400H':{temp:-8,tint:-4,exposure:.2,contrast:-8,highlights:-12,shadows:18,saturation:-6,vibrance:10,grain:15},
+'Agfa Vista 200':{temp:6,tint:10,contrast:16,saturation:22,vignette:-12,grain:26},
+'Lomography Color 400':{temp:-4,contrast:20,saturation:24,vignette:-30,grain:35},
+'Lomography Color 800':{temp:5,contrast:18,saturation:20,vignette:-28,grain:48},
+'Harman Phoenix 200':{temp:-10,tint:14,contrast:26,saturation:12,highlights:-12,vignette:-18,grain:42}},
+'Kino a CineStill':{
+'CineStill 800T':{temp:-28,tint:-4,contrast:6,highlights:-14,shadows:14,saturation:6,vibrance:12,vignette:-14,grain:38},
+'CineStill 50D':{temp:4,contrast:12,saturation:8,highlights:-8,grain:10},
+'CineStill 400D':{temp:6,contrast:8,saturation:6,highlights:-10,shadows:10,grain:24},
+'Kodak Vision3 500T':{temp:-22,contrast:4,highlights:-12,shadows:12,saturation:2,grain:34},
+'Kodak Vision3 250D':{temp:3,contrast:8,saturation:2,highlights:-10,grain:16},
+'Kodak Vision3 200T':{temp:-14,contrast:6,highlights:-10,shadows:10,grain:18},
+'Kodak Vision3 50D':{contrast:10,saturation:6,highlights:-8,grain:8},
+'Fuji Eterna 500':{temp:-6,tint:4,contrast:-6,saturation:-14,highlights:-10,shadows:14,grain:30}},
+'Diapozitiv':{
+'Fujifilm Velvia 50':{contrast:30,saturation:42,vibrance:12,blacks:-12,grain:6},
+'Fujifilm Velvia 100':{contrast:26,saturation:34,blacks:-10,grain:6},
+'Fujifilm Provia 100F':{contrast:16,saturation:16,blacks:-6,grain:6},
+'Fujifilm Astia 100F':{contrast:6,saturation:6,vibrance:8,shadows:8,grain:6},
+'Kodak Ektachrome E100':{temp:-6,contrast:18,saturation:18,blacks:-8,grain:8},
+'Kodachrome 64':{temp:10,tint:4,contrast:24,saturation:20,highlights:-6,blacks:-8,vignette:-10,grain:12},
+'Agfa Precisa 100':{temp:-3,contrast:20,saturation:24,grain:12}},
+'Černobílé':{
+'Kodak Tri-X 400':{bw:true,contrast:35,blacks:-10,vignette:-20,grain:55},
+'Kodak T-Max 100':{bw:true,contrast:22,blacks:-6,sharpen:20,grain:8},
+'Kodak T-Max 400':{bw:true,contrast:20,sharpen:12,grain:18},
+'Kodak Plus-X 125':{bw:true,contrast:14,grain:16},
+'Ilford HP5 Plus 400':{bw:true,contrast:15,shadows:15,grain:40},
+'Ilford FP4 Plus 125':{bw:true,contrast:12,shadows:10,grain:16},
+'Ilford Delta 100':{bw:true,contrast:18,sharpen:16,grain:8},
+'Ilford Delta 400':{bw:true,contrast:18,grain:22},
+'Ilford Delta 3200':{bw:true,contrast:24,highlights:-8,blacks:12,grain:80},
+'Ilford XP2 Super':{bw:true,contrast:6,shadows:14,grain:14},
+'Ilford Pan F Plus 50':{bw:true,contrast:24,sharpen:20,grain:4},
+'Fomapan 100':{bw:true,contrast:20,highlights:-6,blacks:8,grain:24},
+'Fomapan 400':{bw:true,contrast:18,blacks:6,grain:46},
+'Kentmere 400':{bw:true,contrast:8,blacks:10,grain:34},
+'Agfa APX 100':{bw:true,contrast:16,grain:16},
+'Rollei Retro 80S':{bw:true,contrast:28,highlights:-6,blacks:-8,grain:12},
+'Rollei RPX 400':{bw:true,contrast:14,grain:26},
+'CineStill BwXX':{bw:true,contrast:12,shadows:10,highlights:-8,grain:30},
+'Lomography Lady Grey 400':{bw:true,contrast:10,grain:30},
+'Lomography Earl Grey 100':{bw:true,contrast:16,grain:12},
+'Lomography Potsdam Kino':{bw:true,contrast:30,blacks:-8,grain:20}},
+'Experimentální':{
+'Lomochrome Purple':{temp:-18,tint:38,contrast:14,saturation:12,vignette:-18,grain:20},
+'Lomochrome Metropolis':{temp:-4,tint:-2,contrast:8,saturation:-35,highlights:-14,blacks:10,vignette:-12,grain:26},
+'Lomochrome Turquoise':{temp:-26,tint:-14,contrast:12,saturation:8,grain:24},
+'Lomochrome Color 92':{temp:4,contrast:22,saturation:34,vignette:-24,grain:28},
+'Redscale':{temp:55,tint:12,contrast:20,saturation:10,highlights:-18,vignette:-24,grain:34},
+'Cross process':{temp:-15,tint:20,contrast:25,saturation:25,vignette:-30,grain:15},
+'Jemné světlo':{exposure:.3,contrast:-20,highlights:-30,shadows:30,vibrance:20}}};
+const DEF={bw:false,rot:0,flip:false,aspect:0};SEC.forEach(s=>s[1].forEach(r=>DEF[r[0]]=r[4]));
+const $=id=>document.getElementById(id);let view=$('view'),vctx=null;
+const cx2=c=>c.getContext('2d',{willReadFrequently:true});
+let items=[],cur=-1,src,p=DEF,undo=[],geo,gi,geoDirty=true,zoom=false,orig=false,tool=null,stroke=null,cloneSrc=null,raf=0;
+const B={size:40,soft:50,str:80};
+
+// ---- sliders
+const inputs={};
+function paint(i){const mn=+i.min,mx=+i.max,v=(+i.value-mn)/(mx-mn)*100,c=mn<0?-mn/(mx-mn)*100:0;i.style.setProperty('--a',Math.min(v,c)+'%');i.style.setProperty('--b',Math.max(v,c)+'%')}
+function slider(host,k,l,mn,mx,df,st,g,fn){const d=document.createElement('div');d.className='sl';
+ d.innerHTML=`<div><label for="s_${k}">${l}</label><output>${df}</output></div><input type="range" id="s_${k}" min="${mn}" max="${mx}" step="${st}" value="${df}" ${g?'data-g="'+g+'"':''}>`;
+ const i=d.children[1],o=d.querySelector('output');i.oninput=()=>{o.textContent=i.value;paint(i);fn(+i.value)};paint(i);
+ i.ondblclick=()=>{i.value=df;i.oninput()};host.appendChild(d);return[i,o]}
+SEC.forEach(([n,rows],si)=>{const d=document.createElement('details');d.open=si<3;d.innerHTML=`<summary>${n}</summary><div class="body"></div>`;const b=d.lastChild;
+ if(si===0)b.innerHTML='<div class="chips"><button id="bw">Černobíle</button></div>';
+ if(si===3)b.innerHTML='<div class="chips"><button id="rotL">⟲ 90°</button><button id="rotR">⟳ 90°</button><button id="flip">Zrcadlit</button></div>';
+ if(si===4){b.innerHTML='<div class="chips" id="hc"></div>';[['#e5484d','Červená'],['#f08a3c','Oranžová'],['#e8d44d','Žlutá'],['#4caf50','Zelená'],['#3cc4c4','Azurová'],['#3a7bd5','Modrá'],['#8e5bd8','Fialová'],['#c24bb0','Purpurová']].forEach(([c,t],i)=>{const x=document.createElement('button');x.title=t;x.style.cssText='width:22px;height:22px;padding:0;border-radius:50%;background:'+c;x.onclick=()=>hslSel(i);b.firstChild.appendChild(x)})}
+ if(si===5){b.innerHTML='<div class="chips" id="ac"></div>';ASP.forEach(([t,v])=>{const x=document.createElement('button');x.textContent=t;x.onclick=()=>{p.aspect=v;asp();draw()};b.firstChild.appendChild(x)})}
+ rows.forEach(([k,l,mn,mx,df,st,g])=>inputs[k]=slider(b,k,l,mn,mx,df,st,g,v=>{p[k]=v;if(k==='angle')geoDirty=true;draw()}));
+ $('panels').appendChild(d);if(si===4){[...b.querySelectorAll('.sl')].forEach((e,j)=>e.dataset.ch=Math.floor(j/3));hslSel(0)}});
+function syncUI(){for(const k in inputs){inputs[k][0].value=p[k];inputs[k][1].textContent=p[k];paint(inputs[k][0])}$('bw').classList.toggle('on',p.bw);asp()}
+$('bw').onclick=()=>{p.bw=!p.bw;syncUI();draw()};
+$('rotL').onclick=()=>{p.rot=(p.rot+3)%4;geoDirty=true;draw()};
+$('rotR').onclick=()=>{p.rot=(p.rot+1)%4;geoDirty=true;draw()};
+$('flip').onclick=()=>{p.flip=!p.flip;geoDirty=true;draw()};
+const pl=$('presets');
+const r0=document.createElement('button');r0.className='pr';r0.textContent='Obnovit výchozí';r0.onclick=()=>{if(cur<0)return;p=items[cur].p={...DEF};geoDirty=true;syncUI();draw()};pl.appendChild(r0);
+const pf=document.createElement('input');pf.type='search';pf.placeholder='Hledat film…';pf.setAttribute('aria-label','Hledat film');pf.style.cssText='width:calc(100% - 24px);margin:4px 12px 6px;background:#1c1c1c;color:var(--ink);border:1px solid #444;border-radius:3px;padding:4px 7px;font:inherit';pl.appendChild(pf);
+const groups=[];
+Object.entries(PRE).forEach(([name,list],n)=>{const d=document.createElement('details');d.open=n===0;d.className='pg';d.innerHTML='<summary>'+name+' ('+Object.keys(list).length+')</summary>';
+ const btns=Object.entries(list).map(([t,v])=>{const b=document.createElement('button');b.className='pr';b.textContent=t;
+  b.onclick=()=>{if(cur<0)return;p=items[cur].p={...DEF,rot:p.rot,flip:p.flip,aspect:p.aspect,zoom:p.zoom,cropx:p.cropx,cropy:p.cropy,angle:p.angle,...v};syncUI();draw();document.querySelectorAll('.pr.act').forEach(x=>x.classList.remove('act'));b.classList.add('act')};d.appendChild(b);return b});
+ groups.push([d,btns]);pl.appendChild(d)});
+pf.oninput=()=>{const q=pf.value.trim().toLowerCase();groups.forEach(([d,btns],n)=>{let any=false;btns.forEach(b=>{const m=!q||b.textContent.toLowerCase().includes(q);b.style.display=m?'block':'none';any=any||m});d.style.display=any?'':'none';d.open=q?any:n===0})};
+
+// ---- retouch options
+const opts=$('opts');
+[['size','Velikost',5,200,'size'],['soft','Měkkost',0,100,'soft'],['str','Síla',1,100,'str']].forEach(([k,l,a,b])=>slider(opts,'b_'+k,l,a,b,B[k],1,null,v=>B[k]=v));
+document.querySelectorAll('#tools button').forEach(b=>b.onclick=()=>{tool=tool===b.dataset.t?null:b.dataset.t;
+ document.querySelectorAll('#tools button').forEach(x=>x.classList.toggle('on',x.dataset.t===tool));
+ opts.style.display=tool?'block':'none';view.style.cursor=tool?'none':'default';$('cur').style.display='none';
+ $('hint').textContent={heal:'Klikni na skvrnu nebo přejeď přes ni.',clone:'Alt+klik nastaví zdroj, pak maluj.',smooth:'Maluj přes pleť. Sílu uprav posuvníkem.',dodge:'Maluj tam, kde chceš přidat světlo.',burn:'Maluj tam, kde chceš ubrat světlo.'}[tool]||''});
+
+// ---- geometry
+function cropR(ow,oh){let w=1,h=1;const a=p.aspect;
+ if(a){const ar=ow>=oh?a:1/a,cu=ow/oh;if(ar>cu)h=cu/ar;else w=ar/cu}
+ const z=p.zoom/100;w/=z;h/=z;return{w,h,x:.5+p.cropx/100*(1-w)/2,y:.5+p.cropy/100*(1-h)/2}}
+function asp(){document.querySelectorAll('#ac button').forEach((b,i)=>b.classList.toggle('on',ASP[i][1]===p.aspect))}
+function hslSel(i){document.querySelectorAll('#panels .sl[data-ch]').forEach(e=>e.style.display=e.dataset.ch==i?'':'none');document.querySelectorAll('#hc button').forEach((b,j)=>b.style.outline=j===i?'2px solid #fff':'none')}
+function renderGeo(max,store){
+ const iw=src.width,ih=src.height,odd=p.rot%2,ow=odd?ih:iw,oh=odd?iw:ih,k=Math.min(1,max/Math.max(ow,oh));
+ const c=document.createElement('canvas'),cr=cropR(ow,oh);c.width=Math.max(1,Math.round(ow*cr.w*k));c.height=Math.max(1,Math.round(oh*cr.h*k));
+ const x=cx2(c),t=Math.abs(p.angle)*Math.PI/180,s=Math.cos(t)+Math.sin(t)*Math.max(ow/oh,oh/ow),th=(p.rot*90+p.angle)*Math.PI/180;
+ x.translate(c.width/2-(cr.x-.5)*ow*k,c.height/2-(cr.y-.5)*oh*k);x.rotate(th);x.scale(p.flip?-1:1,1);x.scale(s*k,s*k);x.imageSmoothingQuality='high';x.drawImage(src,-iw/2,-ih/2);
+ if(store)gi={k,s,W:c.width,H:c.height,iw,ih,th,cx:(cr.x-.5)*ow*k,cy:(cr.y-.5)*oh*k};return c}
+function toSrc(e){const r=view.getBoundingClientRect(),vx=(e.clientX-r.left)*view.width/r.width,vy=(e.clientY-r.top)*view.height/r.height;
+ const dx=vx-gi.W/2+gi.cx,dy=vy-gi.H/2+gi.cy,c=Math.cos(gi.th),s=Math.sin(gi.th);let x=dx*c+dy*s;const y=-dx*s+dy*c;if(p.flip)x=-x;
+ const f=gi.s*gi.k;return{x:x/f+gi.iw/2,y:y/f+gi.ih/2,R:B.size/f}}
+
+// ---- colour pipeline
+function apply(img,pr){
+ const d=img.data,w=img.width,h=img.height,E=Math.pow(2,pr.exposure),C=1+pr.contrast/100,S=1+pr.saturation/100,V=pr.vibrance/100;
+ const tr=1+pr.temp/250,tb=1-pr.temp/250,tg=1-pr.tint/250,vg=pr.vignette/100,gr=pr.grain/100*.18,cx=w/2,cy=h/2,md=Math.hypot(cx,cy),gc=Math.max(1,Math.max(w,h)/2400);
+ const hi=pr.highlights/100*.3,sh=pr.shadows/100*.3,wh=pr.whites/100*.15,bl=pr.blacks/100*.15;
+ for(let y=0,i=0;y<h;y++)for(let x=0;x<w;x++,i+=4){
+  let r=d[i]/255*E*tr,g=d[i+1]/255*E*tg,b=d[i+2]/255*E*tb;
+  let L=Math.min(1,Math.max(0,.2126*r+.7152*g+.0722*b));
+  const dl=hi*L*L+sh*(1-L)*(1-L)+wh*L**4+bl*(1-L)**4;r+=dl;g+=dl;b+=dl;
+  r=(r-.5)*C+.5;g=(g-.5)*C+.5;b=(b-.5)*C+.5;L=.2126*r+.7152*g+.0722*b;
+  if(pr.bw){r=g=b=L}else{const mx=Math.max(r,g,b),mn=Math.min(r,g,b),f=S+V*(1-Math.min(1,mx-mn));r=L+(r-L)*f;g=L+(g-L)*f;b=L+(b-L)*f}
+  if(vg){const q=Math.hypot(x-cx,y-cy)/md,m=1+vg*q*q*1.2;r*=m;g*=m;b*=m}
+  if(gr){let n=((Math.floor(x/gc)*73856093)^(Math.floor(y/gc)*19349663))>>>0;n=Math.imul(n^(n>>>13),1274126177);n=((n^(n>>>16))&255)/255-.5;const a=n*gr*(1-Math.abs(L-.5)*1.2);r+=a;g+=a;b+=a}
+  d[i]=r*255;d[i+1]=g*255;d[i+2]=b*255}
+ if(pr.sharpen>0){const o=new Uint8ClampedArray(d),a=pr.sharpen/100*.8;
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;for(let c=0;c<3;c++){const j=i+c;d[j]=o[j]+a*(4*o[j]-o[j-4]-o[j+4]-o[j-w*4]-o[j+w*4])}}}}
+function hist(img){const hc=$('hist').getContext('2d'),bn=[0,1,2].map(()=>new Uint32Array(256)),d=img.data;
+ for(let i=0;i<d.length;i+=16){bn[0][d[i]]++;bn[1][d[i+1]]++;bn[2][d[i+2]]++}
+ const mx=Math.max(...bn.map(b=>Math.max(...b.slice(2,254))))||1;hc.clearRect(0,0,256,84);hc.globalCompositeOperation='lighter';
+ ['#a33','#3a3','#46c'].forEach((c,k)=>{hc.fillStyle=c;for(let x=0;x<256;x++){const v=Math.min(84,bn[k][x]/mx*84);hc.fillRect(x,84-v,1,v)}})}
+let GL=null,tex=null,U={},texDirty=true,mipDirty=false,texScale=1,hT=0,maxTex=4096,histCv=null,split=-1,clip=false;
+const VS=`#version 300 es
+in vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
+const FS=`#version 300 es
+precision highp float;
+uniform sampler2D T;
+uniform vec2 R,I,CO;
+uniform vec3 HS[8];
+uniform float F,TH,FL,LOD,GC,ORIG,E,C,S,V,tr,tb,tg,vg,gr,hi,sh,wh,bl,bw,sharp,CL,TX,SPLIT,CLIP,HSON;
+const float HC[8]=float[8](0.,.0833,.1667,.3333,.5,.6667,.75,.8333);
+out vec4 o;
+float lum(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
+vec3 rgb2hsv(vec3 c){vec4 K=vec4(0.,-1./3.,2./3.,-1.);vec4 p=mix(vec4(c.bg,K.wz),vec4(c.gb,K.xy),step(c.b,c.g));vec4 q=mix(vec4(p.xyw,c.r),vec4(c.r,p.yzx),step(p.x,c.r));float d=q.x-min(q.w,q.y);return vec3(abs(q.z+(q.w-q.y)/(6.*d+1e-10)),d/(q.x+1e-10),q.x);}
+vec3 hsv2rgb(vec3 c){vec4 K=vec4(1.,2./3.,1./3.,3.);vec3 p=abs(fract(c.xxx+K.xyz)*6.-K.www);return c.z*mix(K.xxx,clamp(p-K.xxx,0.,1.),c.y);}
+vec2 sp(vec2 fc){
+ vec2 d=vec2(fc.x-R.x*.5,R.y*.5-fc.y)+CO;
+ float c=cos(TH),s=sin(TH);
+ vec2 q=vec2(d.x*c+d.y*s,-d.x*s+d.y*c);
+ if(FL>.5)q.x=-q.x;
+ return q/F+I*.5;}
+vec3 samp(vec2 fc){return textureLod(T,sp(fc)/I,LOD).rgb;}
+float hh(vec2 p){p=fract(p*vec2(.1031,.1030));p+=dot(p,p.yx+33.33);return fract((p.x+p.y)*p.x);}
+vec3 grade(vec3 c,vec2 fc){
+ if(ORIG>.5)return c;
+ c*=vec3(E*tr,E*tg,E*tb);
+ float L=clamp(lum(c),0.,1.);
+ c+=hi*L*L+sh*(1.-L)*(1.-L)+wh*L*L*L*L+bl*pow(1.-L,4.);
+ c=(c-.5)*C+.5;
+ L=lum(c);
+ if(bw<.5){float f=S+V*(1.-min(1.,max(c.r,max(c.g,c.b))-min(c.r,min(c.g,c.b))));c=vec3(L)+(c-vec3(L))*f;}
+ if(HSON>.5){vec3 h=rgb2hsv(clamp(c,0.,1.));float dh=0.,ds=0.,dl=0.;
+  for(int i=0;i<8;i++){float d=abs(h.x-HC[i]);d=min(d,1.-d);float w=max(0.,1.-d/.1)*h.y;dh+=HS[i].x*w;ds+=HS[i].y*w;dl+=HS[i].z*w;}
+  h.x=fract(h.x+dh*.08);h.y=clamp(h.y*(1.+ds),0.,1.);h.z=clamp(h.z*(1.+dl*.6),0.,1.);c=hsv2rgb(h);}
+ if(bw>.5)c=vec3(lum(c));
+ if(vg!=0.){float q=length(fc-R*.5)/length(R*.5);c*=1.+vg*q*q*1.2;}
+ if(gr>0.){float n=hh(floor(sp(fc)/GC))-.5;c+=n*gr*(1.-abs(lum(c)-.5)*1.2);}
+ return c;}
+void main(){
+ vec2 fc=gl_FragCoord.xy;
+ vec2 uv=sp(fc)/I;
+ vec3 raw=textureLod(T,uv,LOD).rgb;
+ vec3 c=grade(raw,fc);
+ if(sharp>0.){
+  vec3 n=grade(samp(fc+vec2(1.,0.)),fc+vec2(1.,0.))+grade(samp(fc-vec2(1.,0.)),fc-vec2(1.,0.))+grade(samp(fc+vec2(0.,1.)),fc+vec2(0.,1.))+grade(samp(fc-vec2(0.,1.)),fc-vec2(0.,1.));
+  c+=sharp*(4.*c-n);}
+ if(CL!=0.||TX!=0.){vec3 b4=textureLod(T,uv,LOD+4.).rgb,b2=textureLod(T,uv,LOD+2.).rgb;c+=(CL*(lum(raw)-lum(b4))+TX*(lum(raw)-lum(b2)))*.8;}
+ if(SPLIT>=0.){if(abs(fc.x-SPLIT*R.x)<1.)c=vec3(1.);else if(fc.x<SPLIT*R.x)c=raw;}
+ if(CLIP>.5){if(max(c.r,max(c.g,c.b))>=.99)c=vec3(1.,.1,.1);else if(min(c.r,min(c.g,c.b))<=.01)c=vec3(.1,.3,1.);}
+ o=vec4(clamp(c,0.,1.),1.);}`;
+function initGL(){let g=null;try{
+ g=view.getContext('webgl2',{antialias:false,alpha:false,preserveDrawingBuffer:true});if(!g)return null;
+ const mk=(t,c)=>{const x=g.createShader(t);g.shaderSource(x,c);g.compileShader(x);if(!g.getShaderParameter(x,g.COMPILE_STATUS))throw new Error(g.getShaderInfoLog(x));return x};
+ const pr=g.createProgram();g.attachShader(pr,mk(g.VERTEX_SHADER,VS));g.attachShader(pr,mk(g.FRAGMENT_SHADER,FS));g.bindAttribLocation(pr,0,'a');g.linkProgram(pr);
+ if(!g.getProgramParameter(pr,g.LINK_STATUS))throw new Error(g.getProgramInfoLog(pr));
+ g.useProgram(pr);const bf=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,bf);g.bufferData(g.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),g.STATIC_DRAW);g.enableVertexAttribArray(0);g.vertexAttribPointer(0,2,g.FLOAT,false,0,0);
+ tex=g.createTexture();g.bindTexture(g.TEXTURE_2D,tex);
+ g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR_MIPMAP_LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);
+ g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);
+ ['T','R','I','CO','HS','F','TH','FL','LOD','GC','ORIG','E','C','S','V','tr','tb','tg','vg','gr','hi','sh','wh','bl','bw','sharp','CL','TX','SPLIT','CLIP','HSON'].forEach(n=>U[n]=g.getUniformLocation(pr,n));
+ maxTex=Math.min(g.getParameter(g.MAX_TEXTURE_SIZE),8192);return g
+}catch(e){console.warn('WebGL2 nedostupné, používám pomalejší CPU režim.',e);
+ const n=document.createElement('canvas');n.id='view';view.replaceWith(n);view=n;return null}}
+function uploadTex(){const W=src.width,H=src.height,k=Math.min(1,maxTex/Math.max(W,H));let t=src;
+ if(k<1){t=document.createElement('canvas');t.width=Math.round(W*k);t.height=Math.round(H*k);const x=t.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(src,0,0,t.width,t.height)}
+ texScale=k;GL.bindTexture(GL.TEXTURE_2D,tex);GL.texImage2D(GL.TEXTURE_2D,0,GL.RGBA,GL.RGBA,GL.UNSIGNED_BYTE,t);GL.generateMipmap(GL.TEXTURE_2D)}
+function glRegion(D,x0,y0){if(texScale<1){texDirty=true;return}GL.bindTexture(GL.TEXTURE_2D,tex);GL.texSubImage2D(GL.TEXTURE_2D,0,x0,y0,GL.RGBA,GL.UNSIGNED_BYTE,D);mipDirty=true}
+function histGL(){if(!GL||!src)return;const h=histCv||(histCv=document.createElement('canvas'));h.width=200;h.height=Math.max(1,Math.round(200*view.height/view.width));
+ const x=cx2(h);x.drawImage(view,0,0,h.width,h.height);hist(x.getImageData(0,0,h.width,h.height))}
+function drawGL(full){const g=GL;g.activeTexture(g.TEXTURE0);
+ if(texDirty){uploadTex();texDirty=false;mipDirty=false}else if(mipDirty){g.bindTexture(g.TEXTURE_2D,tex);g.generateMipmap(g.TEXTURE_2D);mipDirty=false}
+ const iw=src.width,ih=src.height,odd=p.rot%2,ow=odd?ih:iw,oh=odd?iw:ih,cr=cropR(ow,oh),aw=ow*cr.w,ah=oh*cr.h,st=$('stage'),dpr=Math.min(2,devicePixelRatio||1);
+ let cw,ch,W,H;
+ if(full){const k0=Math.min(1,8192/Math.max(aw,ah));W=Math.max(1,Math.round(aw*k0));H=Math.max(1,Math.round(ah*k0))}
+ else if(zoom){const k0=Math.min(1,2600/Math.max(aw,ah));W=Math.max(1,Math.round(aw*k0));H=Math.max(1,Math.round(ah*k0));cw=W;ch=H}
+ else{const f=Math.min((st.clientWidth-32)/aw,(st.clientHeight-32)/ah);cw=Math.max(1,Math.floor(aw*f));ch=Math.max(1,Math.floor(ah*f));
+  const m=Math.min(1,4096/(Math.max(cw,ch)*dpr));W=Math.max(1,Math.round(cw*dpr*m));H=Math.max(1,Math.round(ch*dpr*m))}
+ if(!full)st.style.overflow=zoom?'auto':'hidden';
+ if(view.width!==W||view.height!==H){view.width=W;view.height=H}
+ if(!full){view.style.width=cw+'px';view.style.height=ch+'px'}
+ const t=Math.abs(p.angle)*Math.PI/180,s=Math.cos(t)+Math.sin(t)*Math.max(ow/oh,oh/ow),th=(p.rot*90+p.angle)*Math.PI/180,k=W/aw,f=s*k;
+ gi={k,s,W,H,iw,ih,th,cx:(cr.x-.5)*ow*k,cy:(cr.y-.5)*oh*k};
+ const hs=new Float32Array(24);let hon=0;for(let c=0;c<8;c++){hs[c*3]=p['h'+c]/100;hs[c*3+1]=p['s'+c]/100;hs[c*3+2]=p['l'+c]/100}hs.forEach(v=>{if(v)hon=1});
+ const P={E:Math.pow(2,p.exposure),C:1+p.contrast/100,S:1+p.saturation/100,V:p.vibrance/100,tr:1+p.temp/250,tb:1-p.temp/250,tg:1-p.tint/250,vg:p.vignette/100,gr:p.grain/100*.18,
+  hi:p.highlights/100*.3,sh:p.shadows/100*.3,wh:p.whites/100*.15,bl:p.blacks/100*.15,bw:p.bw?1:0,sharp:orig?0:p.sharpen/100*.8,F:f,TH:th,FL:p.flip?1:0,
+  LOD:f<1?Math.log2(1/f):0,GC:Math.max(1,Math.max(iw,ih)/2400),ORIG:orig?1:0,CL:orig?0:p.clarity/100,TX:orig?0:p.texture/100,SPLIT:split,CLIP:clip?1:0,HSON:hon};
+ for(const n in P)g.uniform1f(U[n],P[n]);g.uniform1i(U.T,0);g.uniform2f(U.R,W,H);g.uniform2f(U.I,iw,ih);g.uniform2f(U.CO,gi.cx,gi.cy);g.uniform3fv(U.HS,hs);
+ g.viewport(0,0,W,H);g.drawArrays(g.TRIANGLES,0,3);
+ if(!full&&!hT)hT=setTimeout(()=>{hT=0;histGL()},120)}
+function drawCPU(){vctx=vctx||view.getContext('2d');if(!vctx){msg('Tento prohlížeč nepodporuje potřebné zobrazení. Použij aktuální Chrome nebo Edge.');return}
+ view.style.width='';view.style.height='';view.style.maxWidth=zoom?'none':'100%';view.style.maxHeight=zoom?'none':'100%';
+ if(geoDirty){geo=renderGeo(zoom?2600:1400,true);geoDirty=false}
+ view.width=geo.width;view.height=geo.height;
+ const img=cx2(geo).getImageData(0,0,geo.width,geo.height);if(!orig)apply(img,p);vctx.putImageData(img,0,0);hist(img)}
+function draw(){cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{if(!src)return;GL?drawGL():drawCPU()})}
+GL=initGL();
+new ResizeObserver(()=>{if(src&&GL)draw()}).observe($('stage'));
+
+// ---- retouching
+function blur(d,w,h,r){const t=new Float32Array(d.length),o=new Uint8ClampedArray(d.length),n=2*r+1,cl=(v,m)=>Math.min(m-1,Math.max(0,v));
+ for(let y=0;y<h;y++)for(let c=0;c<3;c++){let s=0;for(let x=-r;x<=r;x++)s+=d[(y*w+cl(x,w))*4+c];
+  for(let x=0;x<w;x++){t[(y*w+x)*4+c]=s/n;s+=d[(y*w+cl(x+r+1,w))*4+c]-d[(y*w+cl(x-r,w))*4+c]}}
+ for(let x=0;x<w;x++)for(let c=0;c<3;c++){let s=0;for(let y=-r;y<=r;y++)s+=t[(cl(y,h)*w+x)*4+c];
+  for(let y=0;y<h;y++){o[(y*w+x)*4+c]=s/n;s+=t[(cl(y+r+1,h)*w+x)*4+c]-t[(cl(y-r,h)*w+x)*4+c]}}return o}
+function autoOff(x,y,R){const W=src.width,H=src.height,A=Math.ceil(R*6),bx=Math.max(0,Math.floor(x-A)),by=Math.max(0,Math.floor(y-A)),bw=Math.min(W,Math.ceil(x+A))-bx,bh=Math.min(H,Math.ceil(y+A))-by;
+ const D=cx2(src).getImageData(bx,by,bw,bh).data,px=(X,Y)=>{X=Math.round(X-bx);Y=Math.round(Y-by);if(X<0||Y<0||X>=bw||Y>=bh)return null;const k=(Y*bw+X)*4;return[D[k],D[k+1],D[k+2]]};
+ const ring=[];for(let i=0;i<12;i++){const a=i/12*6.283;ring.push([Math.cos(a)*R*1.15,Math.sin(a)*R*1.15])}
+ const base=ring.map(q=>px(x+q[0],y+q[1]));let best=null,bs=1e9;
+ for(const dist of[2.5,4])for(let i=0;i<8;i++){const a=i/8*6.283,ox=Math.cos(a)*R*dist,oy=Math.sin(a)*R*dist;let s=0,ok=true;
+  for(let j=0;j<12;j++){const u=px(x+ox+ring[j][0],y+oy+ring[j][1]),t=base[j];if(!u||!t){ok=false;break}s+=Math.abs(u[0]-t[0])+Math.abs(u[1]-t[1])+Math.abs(u[2]-t[2])}
+  if(ok&&s<bs){bs=s;best={x:ox,y:oy}}}
+ return best||{x:R*2.5,y:0}}
+function stamp(x,y,R,off){const sx=cx2(src),W=src.width,H=src.height,x0=Math.max(0,Math.floor(x-R)),y0=Math.max(0,Math.floor(y-R)),w=Math.min(W,Math.ceil(x+R))-x0,h=Math.min(H,Math.ceil(y+R))-y0;
+ if(w<2||h<2)return;const D=sx.getImageData(x0,y0,w,h),d=D.data,str=B.str/100,inner=1-B.soft/100*.9;let sd,m=[0,0,0];
+ if(tool==='heal'||tool==='clone'){const ax=x0+Math.round(off.x),ay=y0+Math.round(off.y);if(ax<0||ay<0||ax+w>W||ay+h>H)return;sd=sx.getImageData(ax,ay,w,h).data;
+  if(tool==='heal'){const a=[0,0,0],b=[0,0,0];let n=0;for(let j=0;j<h;j++)for(let i=0;i<w;i++){const q=Math.hypot(x0+i-x,y0+j-y)/R;if(q>.7&&q<1){const k=(j*w+i)*4;for(let c=0;c<3;c++){a[c]+=d[k+c];b[c]+=sd[k+c]}n++}}if(n)m=a.map((v,c)=>(v-b[c])/n)}}
+ else if(tool==='smooth')sd=blur(d,w,h,Math.max(1,Math.round(R*.12)));
+ for(let j=0;j<h;j++)for(let i=0;i<w;i++){const q=Math.hypot(x0+i+.5-x,y0+j+.5-y)/R;if(q>=1)continue;
+  let a=q<inner?1:1-(q-inner)/(1-inner);a=a*a*(3-2*a);const k=(j*w+i)*4;
+  for(let c=0;c<3;c++){const o=d[k+c];
+   if(tool==='heal'||tool==='clone')d[k+c]=o+(sd[k+c]+m[c]-o)*a;
+   else if(tool==='smooth')d[k+c]=o+(sd[k+c]-o)*a*str;
+   else d[k+c]=o*(1+(tool==='dodge'?1:-1)*.25*str*a)}}
+ sx.putImageData(D,x0,y0);if(GL)glRegion(D,x0,y0)}
+function pushUndo(){const c=document.createElement('canvas');c.width=src.width;c.height=src.height;cx2(c).drawImage(src,0,0);undo.push(c);if(undo.length>8)undo.shift()}
+function doUndo(){const c=undo.pop();if(!c)return;const x=cx2(src);x.clearRect(0,0,src.width,src.height);x.drawImage(c,0,0);geoDirty=true;texDirty=true;items[cur].thD=true;draw();film()}
+$('undo').onclick=doUndo;
+function curMove(e){const c=$('cur');if(!tool){c.style.display='none';return}const r=view.getBoundingClientRect(),d=B.size*2*r.width/view.width;
+ c.style.display='block';c.style.width=c.style.height=d+'px';c.style.left=e.clientX+'px';c.style.top=e.clientY+'px'}
+view.onpointerdown=e=>{if(!tool||e.button)return;e.preventDefault();view.setPointerCapture(e.pointerId);const pt=toSrc(e);
+ if(tool==='clone'&&(e.altKey||!cloneSrc)){cloneSrc={x:pt.x,y:pt.y};$('hint').textContent='Zdroj nastaven. Klikej a maluj.';return}
+ pushUndo();stroke={off:tool==='heal'?autoOff(pt.x,pt.y,pt.R):{x:cloneSrc.x-pt.x,y:cloneSrc.y-pt.y},last:pt};
+ stamp(pt.x,pt.y,pt.R,stroke.off);geoDirty=true;draw()};
+view.onpointermove=e=>{curMove(e);if(!stroke)return;const pt=toSrc(e);
+ if(Math.hypot(pt.x-stroke.last.x,pt.y-stroke.last.y)>pt.R*.3){stamp(pt.x,pt.y,pt.R,stroke.off);stroke.last=pt;geoDirty=true;draw()}};
+view.onpointerup=()=>{if(stroke){stroke=null;items[cur].thD=true;film()}};
+view.onpointerleave=()=>$('cur').style.display='none';
+
+// ---- files and filmstrip
+function passF(it){const v=$('flt').value;return v==='0'||(v==='p'?it.f>0:it.r>=+v)}
+function stars(){const s=$('stars'),it=items[cur];s.innerHTML='';if(!it)return;
+ for(let i=1;i<=5;i++){const b=document.createElement('button');b.textContent='★';b.title=i+' hv.';b.className=i<=it.r?'on':'';b.onclick=()=>{it.r=it.r===i?0:i;film()};s.appendChild(b)}
+ [['⚑',1,'Vybrat (P)'],['✕',-1,'Zamítnout (X)']].forEach(([t,v,ti])=>{const b=document.createElement('button');b.textContent=t;b.title=ti;b.className=it.f===v?'on':'';b.onclick=()=>{it.f=it.f===v?0:v;film()};s.appendChild(b)})}
+function film(){stars();const f=$('film');f.innerHTML='';items.forEach((it,i)=>{if(!passF(it)&&i!==cur)return;const d=document.createElement('div');d.className='th'+(i===cur?' sel':'');
+ if(!it.th||it.thD){const c=it.th||document.createElement('canvas'),k=64/it.src.height;c.height=64;c.width=Math.round(it.src.width*k);c.getContext('2d').drawImage(it.src,0,0,c.width,64);it.th=c;it.thD=false}
+ d.appendChild(it.th);if(it.r||it.f){const b=document.createElement('span');b.className='bd';b.textContent=(it.f>0?'⚑ ':it.f<0?'✕ ':'')+'★'.repeat(it.r);d.appendChild(b)}
+ if(it.f<0)d.style.opacity='.4';d.onclick=()=>select(i);f.appendChild(d)})}
+function select(i){if(cur>=0)items[cur].p=p;cur=i;const it=items[i];src=it.src;p=it.p;undo=it.undo;cloneSrc=null;geoDirty=true;texDirty=true;
+ $('info').textContent=it.name+'  ·  '+src.width+' × '+src.height+' px';syncUI();draw();film()}
+function add(img,name){const c=document.createElement('canvas');c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;cx2(c).drawImage(img,0,0);
+ items.push({name,src:c,p:{...DEF},undo:[],r:0,f:0});select(items.length-1)}
+const RAWX=/\.(cr2|cr3|crw|nef|nrw|arw|srf|sr2|raf|orf|rw2|pef|dng|srw|3fr|erf|kdc|mrw|raw|rwl|iiq)$/i;
+const msg=t=>$('hint').textContent=t;
+function jpegEnd(u,s){let i=s+2;const n=u.length;
+ while(i<n-3){if(u[i]!==0xFF)return -1;const m=u[i+1];
+  if(m===0xD9)return i+2;if(m===0xFF){i++;continue}
+  if(m===0xDA){i+=2+((u[i+2]<<8)|u[i+3]);
+   while(i<n-1){if(u[i]===0xFF){const c=u[i+1];if(c===0||(c>=0xD0&&c<=0xD7)){i+=2;continue}if(c===0xFF){i++;continue}break}i++}continue}
+  if(m===0x01||(m>=0xD0&&m<=0xD8)){i+=2;continue}
+  i+=2+((u[i+2]<<8)|u[i+3])}
+ return -1}
+function bestJpeg(u){let best=null;
+ for(let i=0;i<u.length-3;i++){if(u[i]===0xFF&&u[i+1]===0xD8&&u[i+2]===0xFF){const e=jpegEnd(u,i);if(e>0){if(!best||e-i>best[1]-best[0])best=[i,e];i=e-1}}}
+ return best&&best[1]-best[0]>20000?best:null}
+function loadScript(url){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=url;s.onload=ok;s.onerror=()=>no(new Error(url));document.head.appendChild(s)})}
+let utifP;function loadUTIF(){return utifP||(utifP=(async()=>{if(window.UTIF)return;
+ try{await loadScript('https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js')}catch(e){}
+ await loadScript('https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js')})().catch(e=>{utifP=null;throw e}))}
+const readImg=(blob)=>new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=URL.createObjectURL(blob)});
+async function addTiff(f){await loadUTIF();const buf=await f.arrayBuffer(),ifds=UTIF.decode(buf);
+ const big=ifds.reduce((a,b)=>(b.t256[0]*b.t257[0]>a.t256[0]*a.t257[0])?b:a);UTIF.decodeImage(buf,big,ifds);
+ const c=document.createElement('canvas');c.width=big.width;c.height=big.height;cx2(c).putImageData(new ImageData(new Uint8ClampedArray(UTIF.toRGBA8(big)),big.width,big.height),0,0);add(c,f.name)}
+async function addRaw(f){const u=new Uint8Array(await f.arrayBuffer()),b=bestJpeg(u);if(!b)throw new Error('no preview');
+ const img=await readImg(new Blob([u.subarray(b[0],b[1])],{type:'image/jpeg'}));add(img,f.name+' (RAW náhled)');
+ msg('RAW: načten vestavěný JPEG náhled '+img.naturalWidth+' × '+img.naturalHeight+' px (8 bit, vyvážení bílé z foťáku).')}
+async function loadFiles(fs){for(const f of[...fs]){try{
+  if(/\.tiff?$/i.test(f.name)||f.type==='image/tiff')await addTiff(f);
+  else if(RAWX.test(f.name))await addRaw(f);
+  else if(f.type.startsWith('image/'))add(await readImg(f),f.name);
+  else msg('Formát souboru '+f.name+' není podporován.')
+ }catch(e){msg('Soubor '+f.name+' se nepodařilo otevřít'+(/\.tiff?$/i.test(f.name)?' (TIFF potřebuje při prvním otevření internet).':'.'))}}}
+$('open').onclick=()=>$('file').click();$('file').onchange=e=>loadFiles(e.target.files);
+addEventListener('dragover',e=>e.preventDefault());addEventListener('dragenter',()=>document.body.classList.add('drag'));addEventListener('dragleave',e=>{if(!e.relatedTarget)document.body.classList.remove('drag')});addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('drag');loadFiles(e.dataTransfer.files)});
+$('zoom').onclick=()=>{zoom=!zoom;view.classList.toggle('z',zoom);$('zoom').classList.toggle('on',zoom);geoDirty=true;draw()};
+const ba=$('ba');['pointerdown','pointerup','pointerleave'].forEach(ev=>ba.addEventListener(ev,()=>{orig=ev==='pointerdown';draw()}));
+addEventListener('keydown',e=>{if(e.key==='\\'){orig=true;draw()}if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();doUndo()}
+ if(e.key==='['||e.key===']'){B.size=Math.min(200,Math.max(5,B.size+(e.key==='['?-5:5)));inputs.b_size;const s=$('s_b_size');s.value=B.size;paint(s);s.parentNode.querySelector('output').textContent=B.size}});
+addEventListener('keyup',e=>{if(e.key==='\\'){orig=false;draw()}});
+$('save').onclick=async()=>{if(!src)return;const f=$('fmt').value,dl=async(b,e)=>{const n='upraveno.'+e,a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)};let c;
+ if(GL){const sv=[orig,split,clip];orig=false;split=-1;clip=false;drawGL(true);c=document.createElement('canvas');c.width=view.width;c.height=view.height;cx2(c).drawImage(view,0,0);[orig,split,clip]=sv;draw()}
+ else{c=renderGeo(Infinity,false);const x=cx2(c),im=x.getImageData(0,0,c.width,c.height);apply(im,p);x.putImageData(im,0,0)}
+ if(f==='image/tiff'){try{await loadUTIF();const im=cx2(c).getImageData(0,0,c.width,c.height);dl(new Blob([UTIF.encodeImage(new Uint8Array(im.data.buffer),c.width,c.height)],{type:'image/tiff'}),'tif')}catch(e){msg('TIFF export potřebuje při prvním použití internet.')}return}
+ c.toBlob(b=>dl(b,f.split('/')[1].replace('jpeg','jpg')),f,.92)};
+
+// ---- Před/Po, ořez světel, kopírování nastavení, hodnocení, klávesy
+const GEO=['rot','flip','aspect','zoom','cropx','cropy','angle'];let clipb=null;
+const grab=()=>{const o={...p};GEO.forEach(k=>delete o[k]);return o};
+$('split').onclick=()=>{split=split<0?.5:-1;$('split').classList.toggle('on',split>=0);draw()};
+$('clip').onclick=()=>{clip=!clip;$('clip').classList.toggle('on',clip);draw()};
+$('cp').onclick=()=>{clipb=grab();msg('Nastavení zkopírováno.')};
+$('ps').onclick=()=>{if(!clipb||cur<0)return;p=items[cur].p={...p,...clipb};syncUI();draw()};
+$('al').onclick=()=>{if(cur<0)return;const g=grab();items.forEach(it=>it.p={...it.p,...g});p=items[cur].p;syncUI();draw();msg('Nastavení použito na všechny fotky ('+items.length+').')};
+$('flt').onchange=film;
+let sdrag=false;const smv=e=>{const r=view.getBoundingClientRect();split=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));draw()};
+view.addEventListener('pointerdown',e=>{if(split>=0&&!tool){sdrag=true;view.setPointerCapture(e.pointerId);smv(e)}});
+view.addEventListener('pointermove',e=>{if(sdrag)smv(e)});view.addEventListener('pointerup',()=>sdrag=false);
+addEventListener('keydown',e=>{if(e.target.type==='search'||e.ctrlKey||e.metaKey||e.altKey||cur<0)return;const k=e.key.toLowerCase(),it=items[cur];
+ if(/^[0-5]$/.test(k)){it.r=+k;film()}else if(k==='p'){it.f=it.f===1?0:1;film()}else if(k==='x'){it.f=it.f===-1?0:-1;film()}else if(k==='j')$('clip').click();
+ else if(e.target.type!=='range'&&k==='arrowright')select(Math.min(items.length-1,cur+1));else if(e.target.type!=='range'&&k==='arrowleft')select(Math.max(0,cur-1))});
+// ---- mobilní rozhraní: záložky a dotyk
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{document.body.dataset.tab=b.dataset.tab;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b))});
+const touchMode=()=>view.style.touchAction=(tool||split>=0)?'none':'auto';touchMode();
+document.querySelectorAll('#tools button,#split').forEach(b=>b.addEventListener('click',touchMode));
+// ---- demo scene (portrait-like blemishes to try the retouch tools)
+(function(){const c=document.createElement('canvas');c.width=1200;c.height=800;const x=c.getContext('2d');
+ let g=x.createLinearGradient(0,0,0,800);g.addColorStop(0,'#3a5f8f');g.addColorStop(.55,'#f0b27a');g.addColorStop(1,'#2b2118');x.fillStyle=g;x.fillRect(0,0,1200,800);
+ g=x.createRadialGradient(820,430,10,820,430,160);g.addColorStop(0,'#fff6d8');g.addColorStop(1,'rgba(255,220,150,0)');x.fillStyle=g;x.fillRect(0,200,1200,500);
+ [['#3d3a38',560,.0045],['#2a2624',640,.007],['#14110f',720,.011]].forEach(([col,b,f],n)=>{x.fillStyle=col;x.beginPath();x.moveTo(0,800);for(let i=0;i<=1200;i+=10)x.lineTo(i,b-Math.sin(i*f+n*2)*60-Math.sin(i*f*3.1)*18);x.lineTo(1200,800);x.fill()});
+ x.fillStyle='#e9e2d0';[[300,160],[500,120],[900,220]].forEach(([a,b])=>{x.beginPath();x.arc(a,b,9,0,7);x.fill()});
+ const i=new Image();i.onload=()=>add(i,'ukazka.png');i.src=c.toDataURL()})();
+</script></body></html>
